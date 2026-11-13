@@ -5,7 +5,7 @@ from aiogram.filters import CommandStart
 from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 
 # ===== НАСТРОЙКИ =====
-BOT_TOKEN = "8688539937:AAFryUHUf6sQc5AlNxgIOyTE1zqThO6eMvc"  # Замените на токен от BotFather
+BOT_TOKEN = os.getenv("8688539937:AAFryUHUf6sQc5AlNxgIOyTE1zqThO6eMvc")  # Замените на токен от BotFather
 VIDEO_FILE_ID = "ВАШ_FILE_ID_КРУЖКА"  # Замените на ID из шага 2
 YOUR_TELEGRAM_LINK = "https://t.me/NGtarasova921"  # Ссылка на ваш профиль
 
