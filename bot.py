@@ -1,13 +1,19 @@
 import asyncio
 import logging
+import os
 from aiogram import Bot, Dispatcher, types
 from aiogram.filters import CommandStart
 from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 
 # ===== НАСТРОЙКИ =====
-BOT_TOKEN = os.getenv("8688539937:AAFryUHUf6sQc5AlNxgIOyTE1zqThO6eMvc")  # Замените на токен от BotFather
-VIDEO_FILE_ID = "ВАШ_FILE_ID_КРУЖКА"  # Замените на ID из шага 2
-YOUR_TELEGRAM_LINK = "https://t.me/NGtarasova921"  # Ссылка на ваш профиль
+# На Render токен берется из переменных окружения (Environment Variables). 
+BOT_TOKEN = os.getenv("BOT_TOKEN", "8688539937:AAFryUHUf6sQc5AlNxgIOyTE1zqThO6eMvc")
+
+# Ссылки
+YOUR_TELEGRAM_LINK = "https://t.me/NGtarasova921"
+
+# ВАШ ЛИЧНЫЙ ID 
+YOUR_TELEGRAM_ID = 998728673  # <--- ЗАМЕНИТЕ НА ВАШ ID
 
 logging.basicConfig(level=logging.INFO)
 bot = Bot(token=BOT_TOKEN)
@@ -17,12 +23,6 @@ dp = Dispatcher()
 
 @dp.message(CommandStart())
 async def start_command(message: types.Message):
-    # Отправляем кружок
-    try:
-        await message.answer_video_note(video_note=VIDEO_FILE_ID)
-    except Exception as e:
-        await message.answer("Привет! (видео не загрузилось, но это не страшно)")
-    
     # Отправляем текст с кнопкой
     kb = InlineKeyboardMarkup(inline_keyboard=[
         [InlineKeyboardButton(text="Забрать 7 Reels", callback_data="get_7_reels")]
@@ -54,6 +54,7 @@ async def process_get_reels(callback: types.CallbackQuery):
     kb = InlineKeyboardMarkup(inline_keyboard=[
         [InlineKeyboardButton(text="Мне нужен монтаж", callback_data="montage")],
         [InlineKeyboardButton(text="Мне нужен контент", callback_data="content")],
+        [InlineKeyboardButton(text="📹 Отправить видео на проверку", callback_data="send_video")],
         [InlineKeyboardButton(text="Не понимаю, что мне нужно", callback_data="help")]
     ])
     await callback.message.answer(
@@ -106,6 +107,50 @@ async def process_help(callback: types.CallbackQuery):
         reply_markup=kb
     )
     await callback.answer()
+
+# ===== ОБРАБОТКА ВИДЕО НА ПРОВЕРКУ =====
+
+@dp.callback_query(lambda c: c.data == "send_video")
+async def process_send_video(callback: types.CallbackQuery):
+    await callback.message.answer(
+        "Отлично! 🎬\n\n"
+        "Пришлите ваше видео (или видео-кружок) прямо в этот чат.\n"
+        "Пожалуйста, добавьте короткое описание (например: 'Видео с последней съемки, посмотрите монтаж')."
+    )
+    await callback.answer()
+
+@dp.message(lambda message: message.video_note or message.video)
+async def handle_incoming_video(message: types.Message):
+    # Проверяем, что ID заменен, чтобы избежать ошибок
+    if YOUR_TELEGRAM_ID == 123456789:
+        await message.answer("⚠️ Ошибка: администратор еще не настроил получение видео.")
+        return
+
+    try:
+        # 1. Пересылаем само видео вам
+        await message.forward(YOUR_TELEGRAM_ID)
+        
+        # 2. Отправляем вам текстовое уведомление, кто это прислал
+        user_name = message.from_user.username or message.from_user.first_name
+        user_id = message.from_user.id
+        
+        await bot.send_message(
+            chat_id=YOUR_TELEGRAM_ID,
+            text=f"📥 Новое видео на проверку!\n\n"
+                 f"От: {user_name}\n"
+                 f"ID: {user_id}\n"
+                 f"Ссылка: tg://user?id={user_id}\n\n"
+                 f"Комментарий: {message.caption or 'Без текста'}"
+        )
+        
+        # 3. Отвечаем пользователю
+        await message.answer(
+            "✅ Видео получено!\n"
+            "Я посмотрю его и свяжусь с вами в ближайшее время."
+        )
+    except Exception as e:
+        print(f"Ошибка при отправке видео: {e}")
+        await message.answer("Произошла ошибка при отправке видео. Пожалуйста, напишите мне напрямую.")
 
 # ===== ЗАПУСК =====
 async def main():
