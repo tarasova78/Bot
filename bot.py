@@ -1,29 +1,37 @@
 import asyncio
 import logging
 import os
+import threading
+from flask import Flask
 from aiogram import Bot, Dispatcher, types
 from aiogram.filters import CommandStart
 from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 
 # ===== НАСТРОЙКИ =====
-# На Render токен берется из переменных окружения (Environment Variables). 
-BOT_TOKEN = os.getenv("BOT_TOKEN", "8688539937:AAFryUHUf6sQc5AlNxgIOyTE1zqThO6eMvc")
-
-# Ссылки
+BOT_TOKEN = os.getenv("BOT_TOKEN", "ВАШ_ТОКЕН_ДЛЯ_ЛОКАЛЬНОГО_ЗАПУСКА")
 YOUR_TELEGRAM_LINK = "https://t.me/NGtarasova921"
-
-# ВАШ ЛИЧНЫЙ ID 
-YOUR_TELEGRAM_ID = 998728673  # <--- ЗАМЕНИТЕ НА ВАШ ID
+YOUR_TELEGRAM_ID = 998728673 # <--- ЗАМЕНИТЕ НА ВАШ ID
 
 logging.basicConfig(level=logging.INFO)
 bot = Bot(token=BOT_TOKEN)
 dp = Dispatcher()
 
+# ===== ВЕБ-СЕРВЕР ДЛЯ RENDER =====
+# Это нужно, чтобы Render видел открытый порт и не выключал бота
+app = Flask(__name__)
+
+@app.route('/')
+def health_check():
+    return "Bot is alive!", 200
+
+def run_web_server():
+    port = int(os.environ.get("PORT", 10000))
+    app.run(host="0.0.0.0", port=port)
+
 # ===== ОБРАБОТЧИКИ =====
 
 @dp.message(CommandStart())
 async def start_command(message: types.Message):
-    # Отправляем текст с кнопкой
     kb = InlineKeyboardMarkup(inline_keyboard=[
         [InlineKeyboardButton(text="Забрать 7 Reels", callback_data="get_7_reels")]
     ])
@@ -50,7 +58,6 @@ async def process_get_reels(callback: types.CallbackQuery):
         "День 7 — Расскажи, кому нужна твоя услуга"
     )
     
-    # Кнопки выбора
     kb = InlineKeyboardMarkup(inline_keyboard=[
         [InlineKeyboardButton(text="Мне нужен монтаж", callback_data="montage")],
         [InlineKeyboardButton(text="Мне нужен контент", callback_data="content")],
@@ -121,16 +128,12 @@ async def process_send_video(callback: types.CallbackQuery):
 
 @dp.message(lambda message: message.video_note or message.video)
 async def handle_incoming_video(message: types.Message):
-    # Проверяем, что ID заменен, чтобы избежать ошибок
     if YOUR_TELEGRAM_ID == 123456789:
         await message.answer("⚠️ Ошибка: администратор еще не настроил получение видео.")
         return
 
     try:
-        # 1. Пересылаем само видео вам
         await message.forward(YOUR_TELEGRAM_ID)
-        
-        # 2. Отправляем вам текстовое уведомление, кто это прислал
         user_name = message.from_user.username or message.from_user.first_name
         user_id = message.from_user.id
         
@@ -142,18 +145,16 @@ async def handle_incoming_video(message: types.Message):
                  f"Ссылка: tg://user?id={user_id}\n\n"
                  f"Комментарий: {message.caption or 'Без текста'}"
         )
-        
-        # 3. Отвечаем пользователю
-        await message.answer(
-            "✅ Видео получено!\n"
-            "Я посмотрю его и свяжусь с вами в ближайшее время."
-        )
+        await message.answer("✅ Видео получено!\nЯ посмотрю его и свяжусь с вами в ближайшее время.")
     except Exception as e:
         print(f"Ошибка при отправке видео: {e}")
         await message.answer("Произошла ошибка при отправке видео. Пожалуйста, напишите мне напрямую.")
 
 # ===== ЗАПУСК =====
 async def main():
+    # Запускаем веб-сервер в фоне
+    threading.Thread(target=run_web_server, daemon=True).start()
+    
     print("Бот запущен...")
     await dp.start_polling(bot)
 
